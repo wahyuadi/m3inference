@@ -51,16 +51,25 @@ def download_resize_img(url, img_out_path, img_out_path_fullsize=None):
             with open(img_out_path_fullsize, "wb") as fh:
                 fh.write(img_data)
     except urllib.error.HTTPError as err:
+<<<<<<< HEAD
         logger.warn("Error fetching profile image from '{}'. HTTP error code was {}. Attempting to fetch with requests...".format(url, err.code))
         img_data = fetch_image(url, img_out_path, img_out_path_fullsize)
         #raise err
+=======
+        logger.warn("Error fetching profile image from Twitter. HTTP error code was {}.".format(err.code))
+        return None
+>>>>>>> 35c3a9e9844aa6b45ab831f5c9d7fdea036369fc
 
-    return resize_img(BytesIO(img_data), img_out_path)
+    return resize_img(BytesIO(img_data), img_out_path, force=True,url=url)
 
 
+<<<<<<< HEAD
 # Wahyu: modified by adding failover when Pillow failed to resize
 # I choose PythonMagick as plan B.
 def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False):
+=======
+def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False,url=None):
+>>>>>>> 35c3a9e9844aa6b45ab831f5c9d7fdea036369fc
     try:
 
         '''
@@ -78,11 +87,12 @@ def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False):
 
         img = Image.open(img_path).convert("RGB")
         if img.size[0] + img.size[1] < 400 and not force:
-            logger.info(f'{img_path} is too small. Skip.')
+            logger.info(f'{img_path} / {url} is too small. Skip.')
             return
         img = img.resize((224, 224), filter)
         img.save(img_out_path)
     except Exception as e:
+<<<<<<< HEAD
         #logger.warning(f'Error when resizing {img_path}\nThe error message is {e}\n')
         # Failover using PythonMagick
         logger.info('Failed resizing with Pillow, will try PythonMagick shortly...')
@@ -93,6 +103,9 @@ def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False):
         #img.write(img_out_path)
         ###################
 
+=======
+        logger.warning(f'Error when resizing {img_path} / {url}\nThe error message is {e}\n')
+>>>>>>> 35c3a9e9844aa6b45ab831f5c9d7fdea036369fc
 
 
 def resize_imgs(src_root, dest_root, src_list=None, filter=Image.BILINEAR, force=False):
