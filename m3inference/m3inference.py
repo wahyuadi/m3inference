@@ -2,6 +2,7 @@
 # @Zijian Wang
 
 import json
+import pprint
 from collections import *
 from os.path import expanduser
 
@@ -117,9 +118,24 @@ class M3Inference:
         else:
             # json object
             data = data_or_datapath
+
+        """
+        # Wahyu: bypass result if it does not have valid img_path
+        for d in data:
+            if "img_path" in d:
+                try:
+                    with open(d['img_path'], 'r') as f:
+                        _ = f.read()
+                except Exception as e:
+                    dummy = {}
+                    bypass_result = OrderedDict([(d['id'], {'age': dummy, 'gender': dummy, 'org': dummy})])
+                    pprint.pprint("Wahyu said bypass_result should be returned: {}".format(e))
+                    return bypass_result
+        ####################
+        """
+
         # prediction
-        dataloader = DataLoader(M3InferenceDataset(data, use_img=self.use_full_model), batch_size,
-                                num_workers=num_workers, pin_memory=True)
+        dataloader = DataLoader(M3InferenceDataset(data, use_img=self.use_full_model), batch_size, num_workers=num_workers, pin_memory=True)
         y_pred = []
         with torch.no_grad():
             for batch in tqdm(dataloader, desc='Predicting...'):

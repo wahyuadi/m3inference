@@ -7,7 +7,13 @@ import json
 import logging
 import os
 import urllib.request
+import requests
+import shutil
+import hashlib
+#import PythonMagick as Magick
 from io import BytesIO
+from time import sleep
+from random import randint
 
 from PIL import Image
 from tqdm import tqdm
@@ -19,6 +25,23 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message
 logger = logging.getLogger(__name__)
 
 
+# Wahyu: plan B when urllib failed to download Twitter image file
+def fetch_image(url, img_out_path, img_out_path_fullsize=None):
+    delay = randint(2,37)/10
+    print("Sleeping for {} second...".format(delay))
+    sleep(delay)
+    print("Woke up. Retry downloading '{}'...".format(url))
+    try:
+        response = requests.get(url, stream=True)
+        img_data = response.content
+        if img_out_path_fullsize != None:
+            with open(img_out_path_fullsize, "wb") as fh:
+                fh.write(img_data)
+    except Exception as err:
+        logger.warn("fetch_image (inside preprocess.py) got exception: {}".format(err))
+    return img_data
+
+
 def download_resize_img(url, img_out_path, img_out_path_fullsize=None):
     # url=url.replace("_200x200","_400x400")
     try:
@@ -28,14 +51,31 @@ def download_resize_img(url, img_out_path, img_out_path_fullsize=None):
             with open(img_out_path_fullsize, "wb") as fh:
                 fh.write(img_data)
     except urllib.error.HTTPError as err:
-        logger.warn("Error fetching profile image from Twitter. HTTP error code was {}.".format(err.code))
-        raise err
+        logger.warn("Error fetching profile image from '{}'. HTTP error code was {}. Attempting to fetch with requests...".format(url, err.code))
+        img_data = fetch_image(url, img_out_path, img_out_path_fullsize)
+        #raise err
 
     return resize_img(BytesIO(img_data), img_out_path)
 
 
+# Wahyu: modified by adding failover when Pillow failed to resize
+# I choose PythonMagick as plan B.
 def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False):
     try:
+
+        '''
+        # Backup and hash the filename
+        ori_name = os.path.basename(img_path)
+        ori_dir = os.path.dir(img_path)
+        copied_dir = "/tmp"
+        copied_name = ori_name 
+
+        temp_name = hashlib.md5(copied_name.encode('utf-8')).hexdigest()
+        temp_path = os.path.join(temp_dir, temp_name)
+        shutil.copy(img_path, temp_path)
+        ###################
+        '''
+
         img = Image.open(img_path).convert("RGB")
         if img.size[0] + img.size[1] < 400 and not force:
             logger.info(f'{img_path} is too small. Skip.')
@@ -43,7 +83,16 @@ def resize_img(img_path, img_out_path, filter=Image.BILINEAR, force=False):
         img = img.resize((224, 224), filter)
         img.save(img_out_path)
     except Exception as e:
-        logger.warning(f'Error when resizing {img_path}\nThe error message is {e}\n')
+        #logger.warning(f'Error when resizing {img_path}\nThe error message is {e}\n')
+        # Failover using PythonMagick
+        logger.info('Failed resizing with Pillow, will try PythonMagick shortly...')
+        #img_path = os.path.join(ori_dir, ori_name)
+        #shutil.copy(temp_path, img_path)
+        #img = Magick.Image(img_path)
+        #img.resize("224x224")
+        #img.write(img_out_path)
+        ###################
+
 
 
 def resize_imgs(src_root, dest_root, src_list=None, filter=Image.BILINEAR, force=False):

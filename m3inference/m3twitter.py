@@ -11,7 +11,7 @@ from os.path import expanduser
 
 from .consts import UNKNOWN_LANG, TW_DEFAULT_PROFILE_IMG
 from .m3inference import M3Inference
-from .preprocess import download_resize_img
+from .preprocess import download_resize_img, resize_img
 from .utils import get_lang
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -38,17 +38,14 @@ class M3Twitter(M3Inference):
             os.makedirs(self.cache_dir)
             logger.info(f'Dir {self.cache_dir} created.')
 
-    def transform_jsonl(self, input_file, output_file, img_path_key=None, lang_key=None, resize_img=True,
-                        keep_full_size_img=False):
+    def transform_jsonl(self, input_file, output_file, img_path_key=None, lang_key=None, resize_img=True, keep_full_size_img=False):
         with open(input_file, "r") as fhIn:
             with open(output_file, "w") as fhOut:
                 for line in fhIn:
-                    m3vals = self.transform_jsonl_object(line, img_path_key=img_path_key, lang_key=lang_key,
-                                                         resize_img=resize_img, keep_full_size_img=keep_full_size_img)
+                    m3vals = self.transform_jsonl_object(line, img_path_key=img_path_key, lang_key=lang_key, resize_img=resize_img, keep_full_size_img=keep_full_size_img)
                     fhOut.write("{}\n".format(json.dumps(m3vals)))
 
-    def transform_jsonl_object(self, input, img_path_key=None, lang_key=None, resize_img=True,
-                               keep_full_size_img=False):
+    def transform_jsonl_object(self, input, img_path_key=None, lang_key=None, resize_img=True, keep_full_size_img=False):
         """
         input is either a Twitter tweet object (https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object)
             or a Twitter user object (https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/user-object)
@@ -84,8 +81,14 @@ class M3Twitter(M3Inference):
             img_path = user["profile_image_url_https"]
             img_path = img_path.replace("_normal", "_400x400")
             dotpos = img_path.rfind(".")
-            img_file_full = "{}/{}.{}".format(self.cache_dir, user["id_str"], img_path[dotpos + 1:])
-            img_file_resize = "{}/{}_224x224.{}".format(self.cache_dir, user["id_str"], img_path[dotpos + 1:])
+            # Wahyu: handle edge cases where the rightmost dot is in TLD, not in file name
+            slashpos = img_path.rfind("/")
+            if slashpos > dotpos:
+                img_file_full = "{}/{}".format(self.cache_dir, user["id_str"])
+                img_file_resize = "{}/{}_224x224".format(self.cache_dir, user["id_str"])
+            else:
+                img_file_full = "{}/{}.{}".format(self.cache_dir, user["id_str"], img_path[dotpos + 1:])
+                img_file_resize = "{}/{}_224x224.{}".format(self.cache_dir, user["id_str"], img_path[dotpos + 1:])
             if not os.path.isfile(img_file_resize):
                 if keep_full_size_img:
                     download_resize_img(img_path, img_file_resize, img_file_full)
@@ -107,7 +110,9 @@ class M3Twitter(M3Inference):
         output = {
             "description": bio,
             "id": user["id_str"],
-            "img_path": img_file_resize,
+            #"img_path": img_file_resize,
+            # alpha channel in PNG creates trouble; replace with JPG version instead
+            "img_path": img_file_resize.replace('png', 'jpg'),
             "lang": lang,
             "name": user["name"],
             "screen_name": user["screen_name"]
